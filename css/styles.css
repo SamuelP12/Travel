@@ -715,6 +715,109 @@ input {
 }
 
 /* ===================== */
+/* Screen: Map           */
+/* ===================== */
+
+#screen-map {
+    background: var(--color-bg);
+}
+
+#map {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+}
+
+.map-back-btn {
+    position: absolute;
+    top: calc(var(--safe-top) + 8px);
+    left: 12px;
+    z-index: 1000;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.map-gps-btn {
+    position: absolute;
+    bottom: calc(var(--safe-bottom) + 24px);
+    left: 16px;
+    z-index: 1000;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-primary);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    transition: background 0.2s;
+}
+
+.map-gps-btn:active {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+.map-gps-btn.locating {
+    animation: pulse 1s infinite;
+}
+
+/* Tour popup on map */
+.tour-popup {
+    text-align: center;
+}
+
+.tour-popup-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 2px;
+}
+
+.tour-popup-region {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.tour-popup-btn {
+    display: inline-block;
+    padding: 6px 16px;
+    background: #0A84FF;
+    color: #fff;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+}
+
+.tour-popup-btn:hover {
+    background: #0070E0;
+}
+
+/* Leaflet dark theme overrides */
+.leaflet-container {
+    background: #1a1a1a;
+}
+
+.leaflet-control-zoom {
+    display: none !important;
+}
+
+/* ===================== */
 /* Scrollbar styling     */
 /* ===================== */
 

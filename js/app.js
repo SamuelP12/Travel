@@ -15,17 +15,29 @@ const tours = [
         stops: 10,
         duration: '50 min',
         distance: '130 mi',
+        route: [
+            [48.5101, -122.2271],  // Sedro-Woolley
+            [48.5363, -121.4432],  // Marblemount
+            [48.6747, -121.2489],  // Newhalem
+            [48.6946, -121.2050],  // Gorge Creek Falls
+            [48.7130, -121.0970],  // Diablo Lake Overlook
+            [48.7350, -121.0680],  // Ross Lake Overlook
+            [48.5162, -120.7383],  // Rainy Pass
+            [48.5220, -120.6640],  // Washington Pass
+            [48.5900, -120.4010],  // Mazama
+            [48.4710, -120.1860],  // Winthrop
+        ],
         locations: [
-            { name: 'Sedro-Woolley', desc: 'Gateway town to the North Cascades', image: 'images/locations/sedro-woolley.jpg' },
-            { name: 'Marblemount', desc: 'Last stop before the wilderness begins', image: 'images/locations/marblemount.jpg' },
-            { name: 'Newhalem', desc: 'A company town built by Seattle City Light', image: 'images/locations/newhalem.jpg' },
-            { name: 'Gorge Creek Falls', desc: 'A thundering waterfall dropping into a turquoise gorge', image: 'images/locations/gorge-creek.jpg' },
-            { name: 'Diablo Lake Overlook', desc: 'Impossibly turquoise water colored by glacial flour', image: 'images/locations/diablo-lake.jpg' },
-            { name: 'Ross Lake Overlook', desc: 'A vast reservoir stretching to the Canadian border', image: 'images/locations/ross-lake.jpg' },
-            { name: 'Rainy Pass', desc: 'Where the Pacific Crest Trail crosses the highway', image: 'images/locations/rainy-pass.jpg' },
-            { name: 'Washington Pass Overlook', desc: 'Jaw-dropping views of Liberty Bell and the Early Winters Spires', image: 'images/locations/washington-pass.jpg' },
-            { name: 'Mazama', desc: 'A tiny mountain village in the Methow Valley', image: 'images/locations/mazama.jpg' },
-            { name: 'Winthrop', desc: 'An Old West-themed town at the end of the highway', image: 'images/locations/winthrop.jpg' },
+            { name: 'Sedro-Woolley', desc: 'Gateway town to the North Cascades', lat: 48.5101, lng: -122.2271, image: 'images/locations/sedro-woolley.jpg' },
+            { name: 'Marblemount', desc: 'Last stop before the wilderness begins', lat: 48.5363, lng: -121.4432, image: 'images/locations/marblemount.jpg' },
+            { name: 'Newhalem', desc: 'A company town built by Seattle City Light', lat: 48.6747, lng: -121.2489, image: 'images/locations/newhalem.jpg' },
+            { name: 'Gorge Creek Falls', desc: 'A thundering waterfall dropping into a turquoise gorge', lat: 48.6946, lng: -121.2050, image: 'images/locations/gorge-creek.jpg' },
+            { name: 'Diablo Lake Overlook', desc: 'Impossibly turquoise water colored by glacial flour', lat: 48.7130, lng: -121.0970, image: 'images/locations/diablo-lake.jpg' },
+            { name: 'Ross Lake Overlook', desc: 'A vast reservoir stretching to the Canadian border', lat: 48.7350, lng: -121.0680, image: 'images/locations/ross-lake.jpg' },
+            { name: 'Rainy Pass', desc: 'Where the Pacific Crest Trail crosses the highway', lat: 48.5162, lng: -120.7383, image: 'images/locations/rainy-pass.jpg' },
+            { name: 'Washington Pass Overlook', desc: 'Jaw-dropping views of Liberty Bell and the Early Winters Spires', lat: 48.5220, lng: -120.6640, image: 'images/locations/washington-pass.jpg' },
+            { name: 'Mazama', desc: 'A tiny mountain village in the Methow Valley', lat: 48.5900, lng: -120.4010, image: 'images/locations/mazama.jpg' },
+            { name: 'Winthrop', desc: 'An Old West-themed town at the end of the highway', lat: 48.4710, lng: -120.1860, image: 'images/locations/winthrop.jpg' },
         ]
     },
     {
@@ -40,17 +52,29 @@ const tours = [
         stops: 10,
         duration: '55 min',
         distance: '92 mi',
+        route: [
+            [63.7306, -148.8886],  // Park Entrance
+            [63.7220, -149.1500],  // Savage River
+            [63.6700, -149.5800],  // Teklanika River
+            [63.5500, -149.9200],  // Polychrome Pass
+            [63.5300, -150.1000],  // Toklat River
+            [63.4800, -150.2200],  // Stony Hill Overlook
+            [63.4310, -150.3100],  // Eielson Visitor Center
+            [63.4560, -150.8680],  // Wonder Lake
+            [63.5340, -151.0750],  // Kantishna
+            [63.0692, -151.0063],  // Denali Summit View
+        ],
         locations: [
-            { name: 'Park Entrance', desc: 'Where the adventure into the wild begins', image: 'images/locations/park-entrance.jpg' },
-            { name: 'Savage River', desc: 'The last stretch accessible by regular vehicles', image: 'images/locations/savage-river.jpg' },
-            { name: 'Teklanika River', desc: 'Braided river channels carved by glacial melt', image: 'images/locations/teklanika.jpg' },
-            { name: 'Polychrome Pass', desc: 'Volcanic cliffs painted in red, orange, and purple', image: 'images/locations/polychrome.jpg' },
-            { name: 'Toklat River', desc: 'Prime grizzly bear territory along a wide riverbed', image: 'images/locations/toklat.jpg' },
-            { name: 'Stony Hill Overlook', desc: 'Your first clear view of Denali on a good day', image: 'images/locations/stony-hill.jpg' },
-            { name: 'Eielson Visitor Center', desc: 'Face to face with the mountain at 66 miles in', image: 'images/locations/eielson.jpg' },
-            { name: 'Wonder Lake', desc: 'The iconic reflection of Denali on still water', image: 'images/locations/wonder-lake.jpg' },
-            { name: 'Kantishna', desc: 'A gold rush settlement at the end of the road', image: 'images/locations/kantishna.jpg' },
-            { name: 'Denali Summit View', desc: 'The highest point in North America at 20,310 feet', image: 'images/locations/denali-summit.jpg' },
+            { name: 'Park Entrance', desc: 'Where the adventure into the wild begins', lat: 63.7306, lng: -148.8886, image: 'images/locations/park-entrance.jpg' },
+            { name: 'Savage River', desc: 'The last stretch accessible by regular vehicles', lat: 63.7220, lng: -149.1500, image: 'images/locations/savage-river.jpg' },
+            { name: 'Teklanika River', desc: 'Braided river channels carved by glacial melt', lat: 63.6700, lng: -149.5800, image: 'images/locations/teklanika.jpg' },
+            { name: 'Polychrome Pass', desc: 'Volcanic cliffs painted in red, orange, and purple', lat: 63.5500, lng: -149.9200, image: 'images/locations/polychrome.jpg' },
+            { name: 'Toklat River', desc: 'Prime grizzly bear territory along a wide riverbed', lat: 63.5300, lng: -150.1000, image: 'images/locations/toklat.jpg' },
+            { name: 'Stony Hill Overlook', desc: 'Your first clear view of Denali on a good day', lat: 63.4800, lng: -150.2200, image: 'images/locations/stony-hill.jpg' },
+            { name: 'Eielson Visitor Center', desc: 'Face to face with the mountain at 66 miles in', lat: 63.4310, lng: -150.3100, image: 'images/locations/eielson.jpg' },
+            { name: 'Wonder Lake', desc: 'The iconic reflection of Denali on still water', lat: 63.4560, lng: -150.8680, image: 'images/locations/wonder-lake.jpg' },
+            { name: 'Kantishna', desc: 'A gold rush settlement at the end of the road', lat: 63.5340, lng: -151.0750, image: 'images/locations/kantishna.jpg' },
+            { name: 'Denali Summit View', desc: 'The highest point in North America at 20,310 feet', lat: 63.0692, lng: -151.0063, image: 'images/locations/denali-summit.jpg' },
         ]
     }
 ];
@@ -72,10 +96,155 @@ const $$ = (sel) => document.querySelectorAll(sel);
 
 const screens = {
     home: $('#screen-home'),
+    map: $('#screen-map'),
     tour: $('#screen-tour'),
     locations: $('#screen-locations'),
     player: $('#screen-player'),
 };
+
+// ===========================
+// Map
+// ===========================
+
+let map = null;
+let userMarker = null;
+let mapFromScreen = 'home';
+
+function initMap() {
+    if (map) return;
+
+    map = L.map('map', {
+        center: [45, -120],
+        zoom: 3,
+        zoomControl: false,
+        attributionControl: false,
+    });
+
+    // Dark map tiles
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        subdomains: 'abcd',
+    }).addTo(map);
+
+    // Draw tour routes
+    tours.forEach(tour => {
+        if (!tour.route) return;
+
+        // Red route line
+        const polyline = L.polyline(tour.route, {
+            color: '#FF3B30',
+            weight: 4,
+            opacity: 0.9,
+        }).addTo(map);
+
+        // Make route clickable
+        polyline.on('click', () => {
+            openTourFromMap(tour);
+        });
+
+        // Invisible wider line for easier tapping
+        const hitArea = L.polyline(tour.route, {
+            color: 'transparent',
+            weight: 30,
+            opacity: 0,
+        }).addTo(map);
+
+        hitArea.on('click', () => {
+            openTourFromMap(tour);
+        });
+
+        // Tour label at center of route
+        const midIndex = Math.floor(tour.route.length / 2);
+        const midPoint = tour.route[midIndex];
+
+        const label = L.marker(midPoint, {
+            icon: L.divIcon({
+                className: '',
+                html: `<div style="
+                    background: rgba(0,0,0,0.8);
+                    backdrop-filter: blur(10px);
+                    -webkit-backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255,255,255,0.2);
+                    border-radius: 8px;
+                    padding: 6px 12px;
+                    white-space: nowrap;
+                    color: #fff;
+                    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+                    font-size: 13px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    text-align: center;
+                ">${tour.title}</div>`,
+                iconSize: null,
+                iconAnchor: [0, 0],
+            }),
+        }).addTo(map);
+
+        label.on('click', () => {
+            openTourFromMap(tour);
+        });
+    });
+}
+
+function openTourFromMap(tour) {
+    mapFromScreen = 'map';
+    openTourDetail(tour);
+}
+
+function openMap() {
+    showScreen('map');
+    // Small delay so the screen is visible before initializing
+    setTimeout(() => {
+        initMap();
+        map.invalidateSize();
+    }, 50);
+}
+
+// GPS button on map
+$('#btn-map-gps').addEventListener('click', () => {
+    const btn = $('#btn-map-gps');
+
+    if (!navigator.geolocation) {
+        alert('Geolocation is not supported by your browser.');
+        return;
+    }
+
+    btn.classList.add('locating');
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            btn.classList.remove('locating');
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+
+            // Remove old marker
+            if (userMarker) {
+                map.removeLayer(userMarker);
+            }
+
+            // Blue pulsing dot for user location
+            userMarker = L.circleMarker([lat, lng], {
+                radius: 8,
+                fillColor: '#0A84FF',
+                fillOpacity: 1,
+                color: '#fff',
+                weight: 3,
+            }).addTo(map);
+
+            map.setView([lat, lng], 8, { animate: true });
+        },
+        () => {
+            btn.classList.remove('locating');
+            alert('Unable to get your location. Please check your location permissions.');
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+});
+
+// Map back button
+$('#btn-back-map').addEventListener('click', () => {
+    goBack('map', 'home');
+});
 
 // ===========================
 // Navigation
@@ -144,6 +313,7 @@ function renderTourList(filter = '') {
     list.querySelectorAll('.tour-card').forEach(card => {
         card.addEventListener('click', () => {
             const tour = tours.find(t => t.id === card.dataset.tour);
+            mapFromScreen = 'home';
             openTourDetail(tour);
         });
     });
@@ -192,7 +362,8 @@ function openTourDetail(tour) {
 
     // Back button
     document.getElementById('btn-back-tour').addEventListener('click', () => {
-        goBack('tour', 'home');
+        goBack('tour', mapFromScreen);
+        mapFromScreen = 'home';
     });
 
     // Get Tour button
@@ -349,46 +520,7 @@ function distanceMiles(lat1, lng1, lat2, lng2) {
 }
 
 $('#btn-locate').addEventListener('click', () => {
-    const btn = $('#btn-locate');
-
-    if (!navigator.geolocation) {
-        alert('Geolocation is not supported by your browser.');
-        return;
-    }
-
-    btn.classList.add('locating');
-
-    navigator.geolocation.getCurrentPosition(
-        (position) => {
-            btn.classList.remove('locating');
-            const userLat = position.coords.latitude;
-            const userLng = position.coords.longitude;
-
-            // Find nearest tour
-            let nearest = null;
-            let nearestDist = Infinity;
-
-            tours.forEach(tour => {
-                const dist = distanceMiles(userLat, userLng, tour.lat, tour.lng);
-                if (dist < nearestDist) {
-                    nearestDist = dist;
-                    nearest = tour;
-                }
-            });
-
-            if (nearest) {
-                const miles = Math.round(nearestDist);
-                $('#search-input').value = '';
-                renderTourList('');
-                openTourDetail(nearest);
-            }
-        },
-        (error) => {
-            btn.classList.remove('locating');
-            alert('Unable to get your location. Please check your location permissions.');
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-    );
+    openMap();
 });
 
 // ===========================
