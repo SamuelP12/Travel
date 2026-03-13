@@ -110,6 +110,26 @@ let map = null;
 let userMarker = null;
 let mapFromScreen = 'home';
 
+// Fetch road-following route from OSRM (free, no API key)
+async function fetchRoadRoute(tour) {
+    try {
+        // Build OSRM waypoints string: lng,lat;lng,lat;...
+        const waypoints = tour.route.map(p => `${p[1]},${p[0]}`).join(';');
+        const url = `https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.code === 'Ok' && data.routes && data.routes[0]) {
+            // OSRM returns [lng, lat], Leaflet needs [lat, lng]
+            return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+        }
+    } catch (e) {
+        // Silently fall back to straight lines
+    }
+    return null;
+}
+
 function initMap() {
     if (map) return;
 
@@ -130,27 +150,31 @@ function initMap() {
     tours.forEach(tour => {
         if (!tour.route) return;
 
-        // Red route line
-        const polyline = L.polyline(tour.route, {
-            color: '#FF3B30',
-            weight: 4,
-            opacity: 0.9,
-        }).addTo(map);
+        // Fetch actual road geometry from OSRM
+        fetchRoadRoute(tour).then(roadCoords => {
+            const coords = roadCoords || tour.route; // fallback to straight lines
 
-        // Make route clickable
-        polyline.on('click', () => {
-            openTourFromMap(tour);
-        });
+            // Red route line following real roads
+            const polyline = L.polyline(coords, {
+                color: '#FF3B30',
+                weight: 4,
+                opacity: 0.9,
+            }).addTo(map);
 
-        // Invisible wider line for easier tapping
-        const hitArea = L.polyline(tour.route, {
-            color: 'transparent',
-            weight: 30,
-            opacity: 0,
-        }).addTo(map);
+            polyline.on('click', () => {
+                openTourFromMap(tour);
+            });
 
-        hitArea.on('click', () => {
-            openTourFromMap(tour);
+            // Invisible wider line for easier tapping
+            const hitArea = L.polyline(coords, {
+                color: 'transparent',
+                weight: 30,
+                opacity: 0,
+            }).addTo(map);
+
+            hitArea.on('click', () => {
+                openTourFromMap(tour);
+            });
         });
 
         // Tour label at center of route
