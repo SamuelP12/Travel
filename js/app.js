@@ -7,6 +7,8 @@ const tours = [
         id: 'north-cascades-highway',
         title: 'North Cascades Highway',
         region: 'Washington State',
+        lat: 48.51,
+        lng: -121.2,
         description: 'Wind through the dramatic North Cascades along Highway 20, one of the most scenic drives in the Pacific Northwest. Towering peaks, glacier-fed lakes, and old-growth forests tell the story of the "American Alps."',
         image: 'images/north-cascades.jpg',
         badge: 'Free',
@@ -30,6 +32,8 @@ const tours = [
         id: 'denali-national-park',
         title: 'Denali National Park',
         region: 'Alaska',
+        lat: 63.33,
+        lng: -150.5,
         description: 'Experience the raw wilderness of Denali, home to North America\'s tallest peak. Six million acres of tundra, grizzlies, caribou, and landscapes that have barely changed in thousands of years.',
         image: 'images/denali.jpg',
         badge: 'Coming Soon',
@@ -328,6 +332,63 @@ $('#btn-back-locations').addEventListener('click', () => {
 
 $('#search-input').addEventListener('input', (e) => {
     renderTourList(e.target.value);
+});
+
+// ===========================
+// GPS Locate
+// ===========================
+
+function distanceMiles(lat1, lng1, lat2, lng2) {
+    const toRad = (d) => d * Math.PI / 180;
+    const R = 3959; // Earth radius in miles
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+$('#btn-locate').addEventListener('click', () => {
+    const btn = $('#btn-locate');
+
+    if (!navigator.geolocation) {
+        alert('Geolocation is not supported by your browser.');
+        return;
+    }
+
+    btn.classList.add('locating');
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            btn.classList.remove('locating');
+            const userLat = position.coords.latitude;
+            const userLng = position.coords.longitude;
+
+            // Find nearest tour
+            let nearest = null;
+            let nearestDist = Infinity;
+
+            tours.forEach(tour => {
+                const dist = distanceMiles(userLat, userLng, tour.lat, tour.lng);
+                if (dist < nearestDist) {
+                    nearestDist = dist;
+                    nearest = tour;
+                }
+            });
+
+            if (nearest) {
+                const miles = Math.round(nearestDist);
+                $('#search-input').value = '';
+                renderTourList('');
+                openTourDetail(nearest);
+            }
+        },
+        (error) => {
+            btn.classList.remove('locating');
+            alert('Unable to get your location. Please check your location permissions.');
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
 });
 
 // ===========================
