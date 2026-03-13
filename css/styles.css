@@ -808,6 +808,30 @@ input {
     background: #0070E0;
 }
 
+/* Map tour labels */
+.tour-map-label {
+    background: none !important;
+    border: none !important;
+}
+
+.tour-map-label-inner {
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 6px 12px;
+    white-space: nowrap;
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transform-origin: center center;
+    transition: transform 0.15s ease;
+}
+
 /* Leaflet dark theme overrides */
 .leaflet-container {
     background: #1a1a1a;

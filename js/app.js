@@ -183,22 +183,8 @@ function initMap() {
 
         const label = L.marker(midPoint, {
             icon: L.divIcon({
-                className: '',
-                html: `<div style="
-                    background: rgba(0,0,0,0.8);
-                    backdrop-filter: blur(10px);
-                    -webkit-backdrop-filter: blur(10px);
-                    border: 1px solid rgba(255,255,255,0.2);
-                    border-radius: 8px;
-                    padding: 6px 12px;
-                    white-space: nowrap;
-                    color: #fff;
-                    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-                    font-size: 13px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    text-align: center;
-                ">${tour.title}</div>`,
+                className: 'tour-map-label',
+                html: `<div class="tour-map-label-inner">${tour.title}</div>`,
                 iconSize: null,
                 iconAnchor: [0, 0],
             }),
@@ -208,6 +194,20 @@ function initMap() {
             openTourFromMap(tour);
         });
     });
+}
+
+    // Scale labels based on zoom
+    function updateLabelScale() {
+        const zoom = map.getZoom();
+        // Scale from 0.55 at zoom 3 to 1.0 at zoom 7+
+        const scale = Math.min(1, Math.max(0.55, (zoom - 3) / 4 * 0.45 + 0.55));
+        document.querySelectorAll('.tour-map-label-inner').forEach(el => {
+            el.style.transform = `scale(${scale})`;
+        });
+    }
+
+    map.on('zoom', updateLabelScale);
+    updateLabelScale();
 }
 
 function openTourFromMap(tour) {
