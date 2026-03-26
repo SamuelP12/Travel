@@ -41,6 +41,30 @@ const tours = [
         ]
     },
     {
+        id: 'methow-valley-school-commute',
+        title: 'Methow Valley School Commute',
+        region: 'Washington State',
+        lat: 48.47,
+        lng: -120.19,
+        description: 'Follow Twin Lakes Road from Winthrop to Methow Valley Elementary School, passing through the stunning Methow Valley with Mount Gardner towering above. A short scenic commute through one of Washington\'s most beautiful landscapes.',
+        image: 'images/methow-school-commute.jpg',
+        badge: 'Free',
+        stops: 3,
+        duration: '15 min',
+        distance: '5 mi',
+        route: [
+            [48.4705, -120.1830],  // Bridge crossing out of Winthrop
+            [48.4784, -120.1865],  // Stop 1
+            [48.4728, -120.1475],  // Stop 2
+            [48.4476, -120.1192],  // Stop 3
+        ],
+        locations: [
+            { name: 'Stop 1', desc: 'First stop along Twin Lakes Road', lat: 48.4784, lng: -120.1865, audio: 'audio/methow-stop1.mp3', image: 'images/locations/methow-stop1.jpg' },
+            { name: 'Stop 2', desc: 'Second stop along Twin Lakes Road', lat: 48.4728, lng: -120.1475, audio: 'audio/methow-stop2.mp3', image: 'images/locations/methow-stop2.jpg' },
+            { name: 'Stop 3', desc: 'Methow Valley Elementary School', lat: 48.4476, lng: -120.1192, audio: 'audio/methow-stop3.mp3', image: 'images/locations/methow-stop3.jpg' },
+        ]
+    },
+    {
         id: 'denali-national-park',
         title: 'Denali National Park',
         region: 'Alaska',
@@ -86,6 +110,9 @@ const tours = [
 let currentTour = null;
 let currentLocationIndex = 0;
 let isPlaying = false;
+let audio = null;
+let geoWatchId = null;
+let triggeredStops = new Set();  // track which stops already played
 
 // ===========================
 // DOM refs
@@ -154,6 +181,13 @@ function initMap() {
         fetchRoadRoute(tour).then(roadCoords => {
             const coords = roadCoords || tour.route; // fallback to straight lines
 
+            // Blue glow line (hidden by default, shown on hover)
+            const glow = L.polyline(coords, {
+                color: '#0A84FF',
+                weight: 10,
+                opacity: 0,
+            }).addTo(map);
+
             // Red route line following real roads
             const polyline = L.polyline(coords, {
                 color: '#FF3B30',
@@ -165,7 +199,7 @@ function initMap() {
                 openTourFromMap(tour);
             });
 
-            // Invisible wider line for easier tapping
+            // Invisible wider line for easier tapping/hovering
             const hitArea = L.polyline(coords, {
                 color: 'transparent',
                 weight: 30,
@@ -174,6 +208,16 @@ function initMap() {
 
             hitArea.on('click', () => {
                 openTourFromMap(tour);
+            });
+
+            hitArea.on('mouseover', () => {
+                glow.setStyle({ opacity: 0.5 });
+                polyline.setStyle({ color: '#0A84FF' });
+            });
+
+            hitArea.on('mouseout', () => {
+                glow.setStyle({ opacity: 0 });
+                polyline.setStyle({ color: '#FF3B30' });
             });
         });
 
@@ -194,7 +238,6 @@ function initMap() {
             openTourFromMap(tour);
         });
     });
-}
 
     // Scale labels based on zoom
     function updateLabelScale() {
@@ -227,42 +270,27 @@ function openMap() {
 // GPS button on map
 $('#btn-map-gps').addEventListener('click', () => {
     const btn = $('#btn-map-gps');
-
-    if (!navigator.geolocation) {
-        alert('Geolocation is not supported by your browser.');
-        return;
-    }
-
     btn.classList.add('locating');
 
-    navigator.geolocation.getCurrentPosition(
-        (position) => {
-            btn.classList.remove('locating');
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
+    requestLocation((lat, lng) => {
+        btn.classList.remove('locating');
 
-            // Remove old marker
-            if (userMarker) {
-                map.removeLayer(userMarker);
-            }
+        // Remove old marker
+        if (userMarker) {
+            map.removeLayer(userMarker);
+        }
 
-            // Blue pulsing dot for user location
-            userMarker = L.circleMarker([lat, lng], {
-                radius: 8,
-                fillColor: '#0A84FF',
-                fillOpacity: 1,
-                color: '#fff',
-                weight: 3,
-            }).addTo(map);
+        // Blue pulsing dot for user location
+        userMarker = L.circleMarker([lat, lng], {
+            radius: 8,
+            fillColor: '#0A84FF',
+            fillOpacity: 1,
+            color: '#fff',
+            weight: 3,
+        }).addTo(map);
 
-            map.setView([lat, lng], 8, { animate: true });
-        },
-        () => {
-            btn.classList.remove('locating');
-            alert('Unable to get your location. Please check your location permissions.');
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-    );
+        map.setView([lat, lng], 8, { animate: true });
+    });
 });
 
 // Map back button
@@ -404,6 +432,8 @@ function openTourDetail(tour) {
 
 function openLocations(tour) {
     currentTour = tour;
+    triggeredStops.clear();
+    startGeoTracking();
     $('#locations-title').textContent = tour.title;
 
     const list = $('#locations-list');
@@ -439,6 +469,57 @@ function openLocations(tour) {
 // Render: Player
 // ===========================
 
+function formatTime(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function loadAudioForLocation(loc) {
+    // Stop and clean up any existing audio
+    if (audio) {
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.load();
+    }
+
+    isPlaying = false;
+    $('.icon-play').classList.remove('hidden');
+    $('.icon-pause').classList.add('hidden');
+    $('#progress-fill').style.width = '0%';
+    $('#time-current').textContent = '0:00';
+    $('#time-total').textContent = '0:00';
+
+    if (loc.audio) {
+        audio = new Audio(loc.audio);
+
+        audio.addEventListener('loadedmetadata', () => {
+            $('#time-total').textContent = formatTime(audio.duration);
+        });
+
+        audio.addEventListener('timeupdate', () => {
+            if (audio.duration) {
+                const pct = (audio.currentTime / audio.duration) * 100;
+                $('#progress-fill').style.width = pct + '%';
+                $('#time-current').textContent = formatTime(audio.currentTime);
+            }
+        });
+
+        audio.addEventListener('ended', () => {
+            isPlaying = false;
+            $('.icon-play').classList.remove('hidden');
+            $('.icon-pause').classList.add('hidden');
+            // Auto-advance to next stop
+            if (currentLocationIndex < currentTour.locations.length - 1) {
+                updatePlayerForLocation(currentLocationIndex + 1);
+            }
+        });
+    } else {
+        audio = null;
+        $('#time-total').textContent = '0:00';
+    }
+}
+
 function openPlayer(locationIndex) {
     currentLocationIndex = locationIndex;
     const loc = currentTour.locations[locationIndex];
@@ -451,13 +532,7 @@ function openPlayer(locationIndex) {
     const imgContainer = $('#player-image');
     imgContainer.style.background = 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)';
 
-    // Reset player state
-    isPlaying = false;
-    $('.icon-play').classList.remove('hidden');
-    $('.icon-pause').classList.add('hidden');
-    $('#progress-fill').style.width = '0%';
-    $('#time-current').textContent = '0:00';
-    $('#time-total').textContent = '2:30'; // placeholder duration
+    loadAudioForLocation(loc);
 
     showScreen('player', 'slide-up');
 }
@@ -471,9 +546,7 @@ function updatePlayerForLocation(index) {
     $('#player-title').textContent = loc.name;
     $('#player-subtitle').textContent = currentTour.title;
 
-    // Reset progress
-    $('#progress-fill').style.width = '0%';
-    $('#time-current').textContent = '0:00';
+    loadAudioForLocation(loc);
 }
 
 // ===========================
@@ -481,17 +554,29 @@ function updatePlayerForLocation(index) {
 // ===========================
 
 $('#btn-play').addEventListener('click', () => {
+    if (!audio) return;
+
+    // Request location if we don't have it yet
+    if (userLat === null) {
+        requestLocation();
+    }
+
     isPlaying = !isPlaying;
+    if (isPlaying) {
+        audio.play();
+    } else {
+        audio.pause();
+    }
     $('.icon-play').classList.toggle('hidden', isPlaying);
     $('.icon-pause').classList.toggle('hidden', !isPlaying);
 });
 
 $('#btn-back-10').addEventListener('click', () => {
-    // Will hook into real audio later
+    if (audio) audio.currentTime = Math.max(0, audio.currentTime - 10);
 });
 
 $('#btn-forward-10').addEventListener('click', () => {
-    // Will hook into real audio later
+    if (audio) audio.currentTime = Math.min(audio.duration, audio.currentTime + 10);
 });
 
 $('#btn-skip').addEventListener('click', () => {
@@ -507,6 +592,10 @@ $('#btn-prev').addEventListener('click', () => {
 });
 
 $('#btn-close-player').addEventListener('click', () => {
+    if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+    }
     isPlaying = false;
     $('.icon-play').classList.remove('hidden');
     $('.icon-pause').classList.add('hidden');
@@ -533,6 +622,12 @@ $('#search-input').addEventListener('input', (e) => {
 // GPS Locate
 // ===========================
 
+let userLat = null;
+let userLng = null;
+
+const GEOFENCE_FEET = 40;
+const GEOFENCE_MILES = GEOFENCE_FEET / 5280;
+
 function distanceMiles(lat1, lng1, lat2, lng2) {
     const toRad = (d) => d * Math.PI / 180;
     const R = 3959; // Earth radius in miles
@@ -541,6 +636,91 @@ function distanceMiles(lat1, lng1, lat2, lng2) {
     const a = Math.sin(dLat / 2) ** 2 +
               Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function checkGeofences(lat, lng) {
+    if (!currentTour) return;
+
+    currentTour.locations.forEach((loc, i) => {
+        if (!loc.audio) return;
+        if (triggeredStops.has(currentTour.id + '-' + i)) return;
+
+        const dist = distanceMiles(lat, lng, loc.lat, loc.lng);
+        if (dist <= GEOFENCE_MILES) {
+            triggeredStops.add(currentTour.id + '-' + i);
+
+            // Auto-open player and start playing
+            currentLocationIndex = i;
+            $('#player-title').textContent = loc.name;
+            $('#player-subtitle').textContent = currentTour.title;
+            $('#player-img').style.display = 'none';
+            $('#player-image').style.background = 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)';
+
+            loadAudioForLocation(loc);
+            showScreen('player', 'slide-up');
+
+            // Auto-play after a short delay
+            setTimeout(() => {
+                if (audio) {
+                    audio.play();
+                    isPlaying = true;
+                    $('.icon-play').classList.add('hidden');
+                    $('.icon-pause').classList.remove('hidden');
+                }
+            }, 300);
+        }
+    });
+}
+
+function startGeoTracking() {
+    if (geoWatchId !== null) return;
+    if (!navigator.geolocation) return;
+
+    geoWatchId = navigator.geolocation.watchPosition(
+        (position) => {
+            userLat = position.coords.latitude;
+            userLng = position.coords.longitude;
+            checkGeofences(userLat, userLng);
+        },
+        () => {},  // silent errors for continuous tracking
+        { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
+    );
+}
+
+function stopGeoTracking() {
+    if (geoWatchId !== null) {
+        navigator.geolocation.clearWatch(geoWatchId);
+        geoWatchId = null;
+    }
+}
+
+function requestLocation(callback, silent = false) {
+    if (!navigator.geolocation) {
+        if (!silent) alert('Geolocation is not supported by your browser.');
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            userLat = position.coords.latitude;
+            userLng = position.coords.longitude;
+            if (callback) callback(userLat, userLng);
+            // Start continuous tracking once we have permission
+            startGeoTracking();
+        },
+        (error) => {
+            if (!silent) {
+                if (error.code === error.PERMISSION_DENIED) {
+                    alert('Location access is blocked.\n\nTo fix this on iPhone:\n1. Open Settings\n2. Scroll to Safari\n3. Scroll down to "Location"\n4. Set it to "Ask" or "Allow"\n5. Then reload this page');
+                } else if (error.code === error.TIMEOUT) {
+                    alert('Location request timed out. Please try again.');
+                } else {
+                    alert('Unable to get your location. Please check that Location Services are turned on in Settings > Privacy & Security > Location Services.');
+                }
+            }
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+    );
 }
 
 $('#btn-locate').addEventListener('click', () => {
@@ -552,3 +732,6 @@ $('#btn-locate').addEventListener('click', () => {
 // ===========================
 
 renderTourList();
+
+// Request location on app launch (silent — no alert if denied, just triggers the prompt)
+requestLocation(null, true);
