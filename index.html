@@ -178,14 +178,12 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="js/app.js"></script>
+    <script src="js/app.js?v=3"></script>
     <script>
-        // Unregister any broken service workers, then re-register
+        // Unregister all old service workers to clear broken cache
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 registrations.forEach(function(reg) { reg.unregister(); });
-            }).then(function() {
-                navigator.serviceWorker.register('sw.js');
             });
         }
     </script>
