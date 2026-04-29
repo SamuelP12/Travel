@@ -113,6 +113,8 @@ let isPlaying = false;
 let audio = null;
 let geoWatchId = null;
 let triggeredStops = new Set();  // track which stops already played
+let audioUnlocked = false;       // track if audio context is unlocked
+let wakeLock = null;             // screen wake lock
 
 // ===========================
 // DOM refs
@@ -403,7 +405,7 @@ function openTourDetail(tour) {
         <div class="location-preview">
             <div class="location-preview-number">${i + 1}</div>
             <div class="location-preview-thumb">
-                <div style="width:100%;height:100%;background:linear-gradient(135deg,#2C2C2E,#3A3A3C);"></div>
+                ${loc.image ? `<img src="${loc.image}" alt="${loc.name}">` : `<div style="width:100%;height:100%;background:linear-gradient(135deg,#2C2C2E,#3A3A3C);"></div>`}
             </div>
             <div class="location-preview-info">
                 <div class="location-preview-name">${loc.name}</div>
@@ -441,7 +443,7 @@ function openLocations(tour) {
         <div class="location-item" data-index="${i}">
             <div class="location-item-number">${i + 1}</div>
             <div class="location-item-thumb">
-                <div style="width:100%;height:100%;background:linear-gradient(135deg,#2C2C2E,#3A3A3C);"></div>
+                ${loc.image ? `<img src="${loc.image}" alt="${loc.name}">` : `<div style="width:100%;height:100%;background:linear-gradient(135deg,#2C2C2E,#3A3A3C);"></div>`}
             </div>
             <div class="location-item-info">
                 <div class="location-item-name">${loc.name}</div>
@@ -526,11 +528,19 @@ function openPlayer(locationIndex) {
 
     $('#player-title').textContent = loc.name;
     $('#player-subtitle').textContent = currentTour.title;
-    $('#player-img').style.display = 'none';
 
-    // Placeholder image
+    // Show location image or placeholder
+    const imgEl = $('#player-img');
     const imgContainer = $('#player-image');
-    imgContainer.style.background = 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)';
+    if (loc.image) {
+        imgEl.src = loc.image;
+        imgEl.alt = loc.name;
+        imgEl.style.display = 'block';
+        imgContainer.style.background = 'var(--color-surface-2)';
+    } else {
+        imgEl.style.display = 'none';
+        imgContainer.style.background = 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)';
+    }
 
     loadAudioForLocation(loc);
 
@@ -545,6 +555,18 @@ function updatePlayerForLocation(index) {
     const loc = currentTour.locations[index];
     $('#player-title').textContent = loc.name;
     $('#player-subtitle').textContent = currentTour.title;
+
+    const imgEl = $('#player-img');
+    const imgContainer = $('#player-image');
+    if (loc.image) {
+        imgEl.src = loc.image;
+        imgEl.alt = loc.name;
+        imgEl.style.display = 'block';
+        imgContainer.style.background = 'var(--color-surface-2)';
+    } else {
+        imgEl.style.display = 'none';
+        imgContainer.style.background = 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)';
+    }
 
     loadAudioForLocation(loc);
 }
@@ -625,7 +647,7 @@ $('#search-input').addEventListener('input', (e) => {
 let userLat = null;
 let userLng = null;
 
-const GEOFENCE_FEET = 40;
+const GEOFENCE_FEET = 150;
 const GEOFENCE_MILES = GEOFENCE_FEET / 5280;
 
 function distanceMiles(lat1, lng1, lat2, lng2) {
@@ -656,25 +678,82 @@ function checkGeofences(lat, lng) {
             $('#player-img').style.display = 'none';
             $('#player-image').style.background = 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)';
 
-            loadAudioForLocation(loc);
-            showScreen('player', 'slide-up');
+            // Reuse existing audio element to avoid autoplay block
+            if (audio) {
+                audio.pause();
+                audio.src = loc.audio;
+                audio.load();
 
-            // Auto-play after a short delay
-            setTimeout(() => {
-                if (audio) {
-                    audio.play();
+                audio.onloadedmetadata = () => {
+                    $('#time-total').textContent = formatTime(audio.duration);
+                };
+                audio.ontimeupdate = () => {
+                    if (audio.duration) {
+                        const pct = (audio.currentTime / audio.duration) * 100;
+                        $('#progress-fill').style.width = pct + '%';
+                        $('#time-current').textContent = formatTime(audio.currentTime);
+                    }
+                };
+                audio.onended = () => {
+                    isPlaying = false;
+                    $('.icon-play').classList.remove('hidden');
+                    $('.icon-pause').classList.add('hidden');
+                    if (currentLocationIndex < currentTour.locations.length - 1) {
+                        updatePlayerForLocation(currentLocationIndex + 1);
+                    }
+                };
+
+                showScreen('player', 'slide-up');
+
+                audio.play().then(() => {
                     isPlaying = true;
                     $('.icon-play').classList.add('hidden');
                     $('.icon-pause').classList.remove('hidden');
-                }
-            }, 300);
+                }).catch(() => {
+                    // If autoplay still blocked, show player but user must tap play
+                    isPlaying = false;
+                    $('.icon-play').classList.remove('hidden');
+                    $('.icon-pause').classList.add('hidden');
+                });
+            } else {
+                loadAudioForLocation(loc);
+                showScreen('player', 'slide-up');
+            }
         }
     });
 }
 
+async function requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => {
+            wakeLock = null;
+        });
+    } catch (e) {
+        // Wake lock request failed (e.g. low battery)
+    }
+}
+
+function releaseWakeLock() {
+    if (wakeLock) {
+        wakeLock.release();
+        wakeLock = null;
+    }
+}
+
+// Re-acquire wake lock when user comes back to the app
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && geoWatchId !== null) {
+        requestWakeLock();
+    }
+});
+
 function startGeoTracking() {
     if (geoWatchId !== null) return;
     if (!navigator.geolocation) return;
+
+    requestWakeLock();
 
     geoWatchId = navigator.geolocation.watchPosition(
         (position) => {
@@ -692,6 +771,7 @@ function stopGeoTracking() {
         navigator.geolocation.clearWatch(geoWatchId);
         geoWatchId = null;
     }
+    releaseWakeLock();
 }
 
 function requestLocation(callback, silent = false) {
@@ -725,6 +805,35 @@ function requestLocation(callback, silent = false) {
 
 $('#btn-locate').addEventListener('click', () => {
     openMap();
+});
+
+// ===========================
+// Unlock audio on first user interaction
+// ===========================
+
+function unlockAudio() {
+    if (audioUnlocked) return;
+    // Create a silent audio play to unlock the audio context
+    const silent = new Audio();
+    silent.play().then(() => {
+        silent.pause();
+        audioUnlocked = true;
+    }).catch(() => {});
+    // Also pre-create the main audio element so future .play() calls are trusted
+    if (!audio) {
+        audio = new Audio();
+        audio.muted = true;
+        audio.play().then(() => {
+            audio.pause();
+            audio.muted = false;
+            audioUnlocked = true;
+        }).catch(() => {});
+    }
+}
+
+// Listen for any user gesture to unlock audio
+['touchstart', 'touchend', 'click'].forEach(evt => {
+    document.addEventListener(evt, unlockAudio, { once: false });
 });
 
 // ===========================
