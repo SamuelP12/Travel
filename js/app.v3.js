@@ -13,7 +13,7 @@ const tours = [
         image: 'images/north-cascades.jpg',
         badge: 'Coming Soon',
         stops: 10,
-        duration: '50 min',
+        duration: '0 min',
         distance: '130 mi',
         route: [
             [48.5101, -122.2271],  // Sedro-Woolley
@@ -50,8 +50,8 @@ const tours = [
         image: 'images/methow-school-commute.jpg',
         badge: 'Free',
         stops: 3,
-        duration: '15 min',
-        distance: '5 mi',
+        duration: '4 min',
+        distance: '14 mi',
         route: [
             [48.4705, -120.1830],  // Bridge crossing out of Winthrop
             [48.4784, -120.1865],  // Stop 1
@@ -74,7 +74,7 @@ const tours = [
         image: 'images/denali.jpg',
         badge: 'In Progress',
         stops: 10,
-        duration: '55 min',
+        duration: '0 min',
         distance: '92 mi',
         route: [
             [63.7306, -148.8886],  // Park Entrance
