@@ -15,7 +15,7 @@ const tours = [
         stops: 10,
         duration: '0 min',
         distance: '130 mi',
-        driveTime: '12 hr',
+        driveTime: '1.5 hr',
         route: [
             [48.5101, -122.2271],  // Sedro-Woolley
             [48.5363, -121.4432],  // Marblemount
@@ -53,7 +53,7 @@ const tours = [
         stops: 3,
         duration: '4 min',
         distance: '14 mi',
-        driveTime: '49 min',
+        driveTime: '15 min',
         route: [
             [48.4705, -120.1830],  // Bridge crossing out of Winthrop
             [48.4784, -120.1865],  // Stop 1
@@ -78,7 +78,7 @@ const tours = [
         stops: 10,
         duration: '0 min',
         distance: '92 mi',
-        driveTime: '5 hr',
+        driveTime: '7 hr',
         route: [
             [63.7306, -148.8886],  // Park Entrance
             [63.7220, -149.1500],  // Savage River
