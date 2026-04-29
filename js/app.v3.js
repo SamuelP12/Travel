@@ -11,7 +11,7 @@ const tours = [
         lng: -121.2,
         description: 'Wind through the dramatic North Cascades along Highway 20, one of the most scenic drives in the Pacific Northwest. Towering peaks, glacier-fed lakes, and old-growth forests tell the story of the "American Alps."',
         image: 'images/north-cascades.jpg',
-        badge: 'Free',
+        badge: 'Coming Soon',
         stops: 10,
         duration: '50 min',
         distance: '130 mi',
@@ -72,7 +72,7 @@ const tours = [
         lng: -150.5,
         description: 'Experience the raw wilderness of Denali, home to North America\'s tallest peak. Six million acres of tundra, grizzlies, caribou, and landscapes that have barely changed in thousands of years.',
         image: 'images/denali.jpg',
-        badge: 'Coming Soon',
+        badge: 'In Progress',
         stops: 10,
         duration: '55 min',
         distance: '92 mi',
@@ -351,9 +351,7 @@ function renderTourList(filter = '') {
     list.innerHTML = filtered.map(tour => `
         <div class="tour-card" data-tour="${tour.id}">
             <div class="tour-card-image">
-                <div style="width:100%;height:100%;background:linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);display:flex;align-items:center;justify-content:center;">
-                    <span style="font-size:48px;opacity:0.3;">&#9968;</span>
-                </div>
+                ${tour.image ? `<img src="${tour.image}" alt="${tour.title}">` : `<div style="width:100%;height:100%;background:linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);display:flex;align-items:center;justify-content:center;"><span style="font-size:48px;opacity:0.3;">&#9968;</span></div>`}
             </div>
             <div class="tour-card-overlay">
                 <div class="tour-card-badge">${tour.badge}</div>
@@ -382,7 +380,7 @@ function openTourDetail(tour) {
 
     // Hero
     $('#tour-hero').innerHTML = `
-        <div style="width:100%;height:100%;background:linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);"></div>
+        ${tour.image ? `<img src="${tour.image}" alt="${tour.title}">` : `<div style="width:100%;height:100%;background:linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);"></div>`}
         <button class="btn-back" id="btn-back-tour">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="15 18 9 12 15 6"></polyline>
