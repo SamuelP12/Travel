@@ -19,7 +19,7 @@
         <div class="status-bar"></div>
         <div class="home-header">
             <h1 class="app-title">Travel</h1>
-            <p class="app-subtitle">Your Personal Audio Tour Guide</p>
+            <p class="app-subtitle">Your Personal Audio Tour Guide <span style="opacity:.5;font-size:.8em">· build 6</span></p>
             <div class="search-row">
                 <div class="search-bar">
                     <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -181,15 +181,44 @@
         </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="js/app.v3.js"></script>
     <script>
-        // Unregister all old service workers to clear broken cache
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                registrations.forEach(function(reg) { reg.unregister(); });
+        // Wipe any old service worker + cache from a previous build, then
+        // reload once so the new code actually takes effect. sessionStorage
+        // flag prevents an infinite reload loop.
+        (function() {
+            if (sessionStorage.getItem('travel-cache-wiped')) return;
+
+            var tasks = [];
+            if ('serviceWorker' in navigator) {
+                tasks.push(
+                    navigator.serviceWorker.getRegistrations().then(function(regs) {
+                        if (regs.length === 0) return false;
+                        return Promise.all(regs.map(function(r) { return r.unregister(); }))
+                            .then(function() { return true; });
+                    })
+                );
+            }
+            if ('caches' in window) {
+                tasks.push(
+                    caches.keys().then(function(keys) {
+                        if (keys.length === 0) return false;
+                        return Promise.all(keys.map(function(k) { return caches.delete(k); }))
+                            .then(function() { return true; });
+                    })
+                );
+            }
+            if (tasks.length === 0) return;
+
+            Promise.all(tasks).then(function(results) {
+                if (results.some(function(r) { return r === true; })) {
+                    sessionStorage.setItem('travel-cache-wiped', '1');
+                    // Use a fresh URL to also bypass Safari's HTTP cache
+                    location.replace(location.pathname + '?_=' + Date.now());
+                }
             });
-        }
+        })();
     </script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/app.v3.js?v=6"></script>
 </body>
 </html>

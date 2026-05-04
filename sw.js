@@ -1,45 +1,13 @@
-const CACHE_NAME = 'travel-v2';
-const ASSETS = [
-    './',
-    'index.html',
-    'css/styles.css',
-    'js/app.js',
-    'manifest.json',
-    'audio/methow-stop1.mp3',
-    'audio/methow-stop2.mp3',
-    'audio/methow-stop3.mp3',
-];
-
-// Install — cache core assets
-self.addEventListener('install', (e) => {
-    e.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
-    );
-    self.skipWaiting();
-});
-
-// Activate — clean old caches
+// Network-only passthrough. The page also unregisters this worker on load,
+// so it should disappear entirely after one refresh. Until then, this
+// prevents stale cached app code from being served.
+self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => {
     e.waitUntil(
-        caches.keys().then((keys) =>
-            Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-        )
+        caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+            .then(() => self.clients.claim())
     );
-    self.clients.claim();
 });
-
-// Fetch — serve from cache, fall back to network
 self.addEventListener('fetch', (e) => {
-    e.respondWith(
-        caches.match(e.request).then((cached) => {
-            return cached || fetch(e.request).then((response) => {
-                // Cache new requests dynamically (like map tiles)
-                if (e.request.method === 'GET' && response.status === 200) {
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
-                }
-                return response;
-            });
-        }).catch(() => caches.match('index.html'))
-    );
+    e.respondWith(fetch(e.request).catch(() => new Response('', { status: 504 })));
 });

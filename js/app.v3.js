@@ -103,6 +103,33 @@ const tours = [
             { name: 'Kantishna', desc: 'A gold rush settlement at the end of the road', lat: 63.5340, lng: -151.0750, image: 'images/locations/kantishna.jpg' },
             { name: 'Denali Summit View', desc: 'The highest point in North America at 20,310 feet', lat: 63.0692, lng: -151.0063, image: 'images/locations/denali-summit.jpg' },
         ]
+    },
+    {
+        id: 'test-liberty-bell',
+        title: 'Test',
+        region: 'Liberty Bell HS',
+        lat: 48.4422,
+        lng: -120.1700,
+        description: 'Walking test around Liberty Bell High School. Tight geofence radii so each of the three stops fires as you walk past it. Audio is reused from the Methow commute just so you can hear something.',
+        image: '',
+        badge: 'Test',
+        stops: 3,
+        duration: '4 min',
+        distance: '0.1 mi',
+        driveTime: '—',
+        // Walking-scale geofence radii (override the driving defaults)
+        instantRadiusFeet: 60,    // ~18 m — only fires when you're right at a corner
+        approachRadiusFeet: 120,  // ~37 m — closest-approach catches drive-bys
+        route: [
+            [48.4422583, -120.1689],   // Front (east, Twin Lakes Rd)
+            [48.4429000, -120.1700],   // Side (north)
+            [48.4422000, -120.1709],   // Back (west)
+        ],
+        locations: [
+            { name: 'Front (Twin Lakes Rd)', desc: 'East side, facing the road', lat: 48.4422583, lng: -120.1689, audio: 'audio/methow-stop1.mp3' },
+            { name: 'Side (North)',           desc: 'North side of the building', lat: 48.4429000, lng: -120.1700, audio: 'audio/methow-stop2.mp3' },
+            { name: 'Back (West)',            desc: 'West side of the building',  lat: 48.4422000, lng: -120.1709, audio: 'audio/methow-stop3.mp3' },
+        ]
     }
 ];
 
@@ -116,8 +143,11 @@ let isPlaying = false;
 let audio = null;
 let geoWatchId = null;
 let triggeredStops = new Set();  // track which stops already played
+let stopDistances = new Map();   // previous distance to each stop, for closest-approach detection
+let pendingStops = [];           // stops queued by the geofence while another stop is mid-play
 let audioUnlocked = false;       // track if audio context is unlocked
 let wakeLock = null;             // screen wake lock
+let silentAudio = null;          // silent looping track to keep iOS from suspending the tab
 
 // ===========================
 // DOM refs
@@ -437,6 +467,7 @@ function openTourDetail(tour) {
 function openLocations(tour) {
     currentTour = tour;
     triggeredStops.clear();
+    stopDistances.clear();
     startGeoTracking();
     $('#locations-title').textContent = tour.title;
 
@@ -480,12 +511,12 @@ function formatTime(seconds) {
 }
 
 function loadAudioForLocation(loc) {
-    // Stop and clean up any existing audio
-    if (audio) {
-        audio.pause();
-        audio.removeAttribute('src');
-        audio.load();
+    // Reuse a single Audio element so iOS keeps its autoplay unlock
+    if (!audio) {
+        audio = new Audio();
     }
+
+    audio.pause();
 
     isPlaying = false;
     $('.icon-play').classList.remove('hidden');
@@ -495,32 +526,107 @@ function loadAudioForLocation(loc) {
     $('#time-total').textContent = '0:00';
 
     if (loc.audio) {
-        audio = new Audio(loc.audio);
+        audio.src = loc.audio;
+        audio.load();
 
-        audio.addEventListener('loadedmetadata', () => {
+        audio.onloadedmetadata = () => {
             $('#time-total').textContent = formatTime(audio.duration);
-        });
-
-        audio.addEventListener('timeupdate', () => {
+        };
+        audio.ontimeupdate = () => {
             if (audio.duration) {
                 const pct = (audio.currentTime / audio.duration) * 100;
                 $('#progress-fill').style.width = pct + '%';
                 $('#time-current').textContent = formatTime(audio.currentTime);
             }
-        });
-
-        audio.addEventListener('ended', () => {
+        };
+        audio.onended = () => {
             isPlaying = false;
             $('.icon-play').classList.remove('hidden');
             $('.icon-pause').classList.add('hidden');
-            // Auto-advance to next stop
+            // Resume the keep-alive track so the tab stays alive between stops
+            startKeepAliveLoop();
+            // Drain queued geofence stops first — these are stops the user
+            // drove past while we were playing something else
+            if (pendingStops.length > 0) {
+                const next = pendingStops.shift();
+                startStopAudio(next);
+                return;
+            }
+            // Otherwise auto-advance to the next stop in the tour
             if (currentLocationIndex < currentTour.locations.length - 1) {
                 updatePlayerForLocation(currentLocationIndex + 1);
             }
-        });
+        };
     } else {
-        audio = null;
-        $('#time-total').textContent = '0:00';
+        audio.removeAttribute('src');
+        audio.load();
+        audio.onloadedmetadata = null;
+        audio.ontimeupdate = null;
+        audio.onended = null;
+    }
+}
+
+// Geofence entry point. Decides whether to skip, queue, or play right now:
+//   - already playing this exact stop → skip (don't restart)
+//   - already playing a different stop → queue, drained on `ended`
+//   - otherwise → play immediately
+function playStopAudio(index) {
+    const loc = currentTour && currentTour.locations[index];
+    if (!loc) return;
+
+    if (audio && audio.src && !audio.paused) {
+        // src is the resolved absolute URL; loc.audio is the relative path
+        if (loc.audio && audio.src.endsWith(loc.audio)) {
+            return; // already playing this stop, leave it alone
+        }
+        if (!pendingStops.includes(index)) {
+            pendingStops.push(index);
+        }
+        return;
+    }
+
+    startStopAudio(index);
+}
+
+// Actually load + open + play. Bypasses skip/queue logic.
+function startStopAudio(index) {
+    currentLocationIndex = index;
+    const loc = currentTour.locations[index];
+
+    $('#player-title').textContent = loc.name;
+    $('#player-subtitle').textContent = currentTour.title;
+
+    const imgEl = $('#player-img');
+    const imgContainer = $('#player-image');
+    if (loc.image) {
+        imgEl.src = loc.image;
+        imgEl.alt = loc.name;
+        imgEl.style.display = 'block';
+        imgContainer.style.background = 'var(--color-surface-2)';
+    } else {
+        imgEl.style.display = 'none';
+        imgContainer.style.background = 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)';
+    }
+
+    loadAudioForLocation(loc);
+    showScreen('player', 'slide-up');
+
+    if (audio && loc.audio) {
+        // Pause the silent keep-alive track so it doesn't compete for the
+        // iOS audio session — the real audio takes over and interrupts other apps
+        pauseKeepAliveLoop();
+        audio.play().then(() => {
+            isPlaying = true;
+            $('.icon-play').classList.add('hidden');
+            $('.icon-pause').classList.remove('hidden');
+        }).catch(() => {
+            // Autoplay still blocked — leave player visible so user can tap play
+            isPlaying = false;
+            $('.icon-play').classList.remove('hidden');
+            $('.icon-pause').classList.add('hidden');
+            // Keep-alive loop resumes so the tab stays alive
+            startKeepAliveLoop();
+        });
     }
 }
 
@@ -623,6 +729,10 @@ $('#btn-close-player').addEventListener('click', () => {
     isPlaying = false;
     $('.icon-play').classList.remove('hidden');
     $('.icon-pause').classList.add('hidden');
+    // User explicitly closed — drop any geofence-queued stops
+    pendingStops.length = 0;
+    // Keep the silent track running so geofence triggers still wake the tab
+    startKeepAliveLoop();
     goBack('player', 'locations');
 });
 
@@ -649,8 +759,12 @@ $('#search-input').addEventListener('input', (e) => {
 let userLat = null;
 let userLng = null;
 
-const GEOFENCE_FEET = 150;
-const GEOFENCE_MILES = GEOFENCE_FEET / 5280;
+// Two-tier trigger: tight zone fires immediately; wider zone fires when you've
+// passed the closest point (distance was within radius and is now increasing).
+// This way a stop fires whether you're on foot or driving past at 50 mph, and
+// every stop is checked independently — missing one never blocks the next.
+const STOP_INSTANT_RADIUS_MILES = 250 / 5280;   // ~250 ft instant trigger
+const STOP_APPROACH_RADIUS_MILES = 0.25;        // 0.25 mi closest-approach trigger
 
 function distanceMiles(lat1, lng1, lat2, lng2) {
     const toRad = (d) => d * Math.PI / 180;
@@ -665,64 +779,47 @@ function distanceMiles(lat1, lng1, lat2, lng2) {
 function checkGeofences(lat, lng) {
     if (!currentTour) return;
 
-    currentTour.locations.forEach((loc, i) => {
-        if (!loc.audio) return;
-        if (triggeredStops.has(currentTour.id + '-' + i)) return;
+    // Per-tour overrides allow walking-scale tests with tighter radii
+    const instantRadius = currentTour.instantRadiusFeet
+        ? currentTour.instantRadiusFeet / 5280
+        : STOP_INSTANT_RADIUS_MILES;
+    const approachRadius = currentTour.approachRadiusFeet
+        ? currentTour.approachRadiusFeet / 5280
+        : STOP_APPROACH_RADIUS_MILES;
 
+    let toTrigger = -1;
+
+    for (let i = 0; i < currentTour.locations.length; i++) {
+        const loc = currentTour.locations[i];
+        if (!loc.audio) continue;
+
+        const key = currentTour.id + '-' + i;
         const dist = distanceMiles(lat, lng, loc.lat, loc.lng);
-        if (dist <= GEOFENCE_MILES) {
-            triggeredStops.add(currentTour.id + '-' + i);
+        const prevDist = stopDistances.get(key);
+        stopDistances.set(key, dist);
 
-            // Auto-open player and start playing
-            currentLocationIndex = i;
-            $('#player-title').textContent = loc.name;
-            $('#player-subtitle').textContent = currentTour.title;
-            $('#player-img').style.display = 'none';
-            $('#player-image').style.background = 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)';
+        if (triggeredStops.has(key)) continue;
 
-            // Reuse existing audio element to avoid autoplay block
-            if (audio) {
-                audio.pause();
-                audio.src = loc.audio;
-                audio.load();
-
-                audio.onloadedmetadata = () => {
-                    $('#time-total').textContent = formatTime(audio.duration);
-                };
-                audio.ontimeupdate = () => {
-                    if (audio.duration) {
-                        const pct = (audio.currentTime / audio.duration) * 100;
-                        $('#progress-fill').style.width = pct + '%';
-                        $('#time-current').textContent = formatTime(audio.currentTime);
-                    }
-                };
-                audio.onended = () => {
-                    isPlaying = false;
-                    $('.icon-play').classList.remove('hidden');
-                    $('.icon-pause').classList.add('hidden');
-                    if (currentLocationIndex < currentTour.locations.length - 1) {
-                        updatePlayerForLocation(currentLocationIndex + 1);
-                    }
-                };
-
-                showScreen('player', 'slide-up');
-
-                audio.play().then(() => {
-                    isPlaying = true;
-                    $('.icon-play').classList.add('hidden');
-                    $('.icon-pause').classList.remove('hidden');
-                }).catch(() => {
-                    // If autoplay still blocked, show player but user must tap play
-                    isPlaying = false;
-                    $('.icon-play').classList.remove('hidden');
-                    $('.icon-pause').classList.add('hidden');
-                });
-            } else {
-                loadAudioForLocation(loc);
-                showScreen('player', 'slide-up');
-            }
+        // Instant trigger: standing/driving inside the tight radius.
+        if (dist <= instantRadius) {
+            toTrigger = i;
         }
-    });
+        // Closest-approach trigger: was within the wider radius and is now
+        // moving away. Catches drive-bys that never sample inside 250 ft.
+        else if (prevDist !== undefined &&
+                 dist > prevDist &&
+                 prevDist <= approachRadius) {
+            toTrigger = i;
+        }
+
+        if (toTrigger === i) {
+            triggeredStops.add(key);
+        }
+    }
+
+    if (toTrigger >= 0) {
+        playStopAudio(toTrigger);
+    }
 }
 
 async function requestWakeLock() {
@@ -744,10 +841,25 @@ function releaseWakeLock() {
     }
 }
 
-// Re-acquire wake lock when user comes back to the app
+// Re-acquire wake lock and force a fresh geofence check when the user comes
+// back to the app — `watchPosition` may have stalled while the tab was hidden.
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && geoWatchId !== null) {
-        requestWakeLock();
+    if (document.visibilityState !== 'visible') return;
+
+    if (geoWatchId !== null) requestWakeLock();
+    // Make sure the silent keep-alive track is still running
+    startKeepAliveLoop();
+
+    if (currentTour && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                userLat = pos.coords.latitude;
+                userLng = pos.coords.longitude;
+                checkGeofences(userLat, userLng);
+            },
+            () => {},
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+        );
     }
 });
 
@@ -764,7 +876,7 @@ function startGeoTracking() {
             checkGeofences(userLat, userLng);
         },
         () => {},  // silent errors for continuous tracking
-        { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
     );
 }
 
@@ -810,18 +922,75 @@ $('#btn-locate').addEventListener('click', () => {
 });
 
 // ===========================
-// Unlock audio on first user interaction
+// Unlock audio + keep-alive loop
 // ===========================
 
+// Build a 5-second silent WAV in memory so we don't have to ship a file.
+// Used as a continuously-looping silent track to keep iOS Safari from
+// suspending the tab when the screen locks or the user switches apps —
+// `geolocation.watchPosition` only fires while the tab is alive, and
+// "media is playing" is the cheapest way to keep it alive on iOS.
+function createSilentBlobUrl() {
+    const sampleRate = 22050;
+    const duration = 5;
+    const numSamples = sampleRate * duration;
+    const buffer = new ArrayBuffer(44 + numSamples * 2);
+    const view = new DataView(buffer);
+    let p = 0;
+    const wstr = (s) => { for (let i = 0; i < s.length; i++) view.setUint8(p++, s.charCodeAt(i)); };
+    wstr('RIFF'); view.setUint32(p, 36 + numSamples * 2, true); p += 4;
+    wstr('WAVE'); wstr('fmt ');
+    view.setUint32(p, 16, true); p += 4;
+    view.setUint16(p, 1, true); p += 2;   // PCM
+    view.setUint16(p, 1, true); p += 2;   // mono
+    view.setUint32(p, sampleRate, true); p += 4;
+    view.setUint32(p, sampleRate * 2, true); p += 4;
+    view.setUint16(p, 2, true); p += 2;
+    view.setUint16(p, 16, true); p += 2;
+    wstr('data'); view.setUint32(p, numSamples * 2, true); p += 4;
+    return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+}
+
+function ensureSilentAudio() {
+    if (silentAudio) return;
+    silentAudio = new Audio(createSilentBlobUrl());
+    silentAudio.loop = true;
+    silentAudio.volume = 0;
+    silentAudio.preload = 'auto';
+    // Whenever the silent track gets paused by something other than us
+    // (system events, audio session interruption), try to restart it
+    silentAudio.addEventListener('pause', () => {
+        if (audio && !audio.paused) return; // real audio is playing — fine
+        // Small timeout so we don't fight legitimate pauses
+        setTimeout(() => {
+            if (silentAudio && silentAudio.paused && (!audio || audio.paused)) {
+                silentAudio.play().catch(() => {});
+            }
+        }, 200);
+    });
+}
+
+function startKeepAliveLoop() {
+    ensureSilentAudio();
+    if (silentAudio.paused) {
+        silentAudio.play().catch(() => {});
+    }
+}
+
+function pauseKeepAliveLoop() {
+    if (silentAudio && !silentAudio.paused) {
+        silentAudio.pause();
+    }
+}
+
 function unlockAudio() {
-    if (audioUnlocked) return;
-    // Create a silent audio play to unlock the audio context
-    const silent = new Audio();
-    silent.play().then(() => {
-        silent.pause();
-        audioUnlocked = true;
-    }).catch(() => {});
-    // Also pre-create the main audio element so future .play() calls are trusted
+    if (audioUnlocked) {
+        // Keep-alive may have been paused by an interruption — make sure it's running
+        startKeepAliveLoop();
+        return;
+    }
+    // Pre-create the main audio element so future .play() calls (from the
+    // geofence trigger, with no user gesture) are trusted on iOS.
     if (!audio) {
         audio = new Audio();
         audio.muted = true;
@@ -830,7 +999,11 @@ function unlockAudio() {
             audio.muted = false;
             audioUnlocked = true;
         }).catch(() => {});
+    } else {
+        audioUnlocked = true;
     }
+    // Start the silent keep-alive track on the same gesture
+    startKeepAliveLoop();
 }
 
 // Listen for any user gesture to unlock audio
