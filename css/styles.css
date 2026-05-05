@@ -507,6 +507,38 @@ input {
     padding: 8px 20px 40px;
 }
 
+/* Live GPS tracking strip on locations screen */
+.tracking-strip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px 20px 0;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 10px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.85);
+}
+.tracking-strip[hidden] { display: none; }
+.tracking-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #f59e0b; /* amber while waiting */
+    box-shadow: 0 0 0 3px rgba(245,158,11,0.18);
+    flex-shrink: 0;
+    transition: background 0.3s, box-shadow 0.3s;
+}
+.tracking-dot.locked { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.20); animation: tracking-pulse 2.4s infinite; }
+.tracking-dot.firing { background: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.30); }
+@keyframes tracking-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(34,197,94,0.20); }
+    50%      { box-shadow: 0 0 0 6px rgba(34,197,94,0.05); }
+}
+.tracking-strip .tracking-text { flex: 1; line-height: 1.3; }
+.tracking-strip .tracking-text strong { color: #fff; font-weight: 600; }
+
 .location-item {
     display: flex;
     align-items: center;

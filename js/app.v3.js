@@ -117,9 +117,11 @@ const tours = [
         duration: '4 min',
         distance: '0.1 mi',
         driveTime: '—',
-        // Walking-scale geofence radii (override the driving defaults)
-        instantRadiusFeet: 60,    // ~18 m — only fires when you're right at a corner
-        approachRadiusFeet: 120,  // ~37 m — closest-approach catches drive-bys
+        // Walking-scale geofence radii (override the driving defaults).
+        // Loosened from 60/120 to 120/250 — typical iPhone GPS drift is
+        // 15-30m near buildings, so tighter radii were missing fires.
+        instantRadiusFeet: 120,   // ~37 m
+        approachRadiusFeet: 250,  // ~76 m — closest-approach catches drive-bys
         route: [
             [48.4422583, -120.1689],   // Front (east, Twin Lakes Rd)
             [48.4429000, -120.1700],   // Side (north)
@@ -469,6 +471,7 @@ function openLocations(tour) {
     triggeredStops.clear();
     stopDistances.clear();
     startGeoTracking();
+    showTrackingStrip();
     $('#locations-title').textContent = tour.title;
 
     const list = $('#locations-list');
@@ -741,6 +744,8 @@ $('#btn-close-player').addEventListener('click', () => {
 // ===========================
 
 $('#btn-back-locations').addEventListener('click', () => {
+    hideTrackingStrip();
+    stopGeoTracking();
     goBack('locations', 'tour');
 });
 
@@ -788,6 +793,8 @@ function checkGeofences(lat, lng) {
         : STOP_APPROACH_RADIUS_MILES;
 
     let toTrigger = -1;
+    let nearestUntriggered = null;
+    let nearestDistMiles = Infinity;
 
     for (let i = 0; i < currentTour.locations.length; i++) {
         const loc = currentTour.locations[i];
@@ -799,6 +806,11 @@ function checkGeofences(lat, lng) {
         stopDistances.set(key, dist);
 
         if (triggeredStops.has(key)) continue;
+
+        if (dist < nearestDistMiles) {
+            nearestDistMiles = dist;
+            nearestUntriggered = loc;
+        }
 
         // Instant trigger: standing/driving inside the tight radius.
         if (dist <= instantRadius) {
@@ -817,9 +829,68 @@ function checkGeofences(lat, lng) {
         }
     }
 
+    updateTrackingStrip(nearestUntriggered, nearestDistMiles, instantRadius);
+
     if (toTrigger >= 0) {
+        markTrackingFiring(currentTour.locations[toTrigger]);
         playStopAudio(toTrigger);
     }
+}
+
+// ----- Live tracking strip on the locations screen -----
+
+function showTrackingStrip() {
+    const strip = $('#tracking-strip');
+    if (!strip) return;
+    strip.hidden = false;
+    const dot = $('#tracking-dot');
+    const text = $('#tracking-text');
+    if (dot) { dot.classList.remove('locked', 'firing'); }
+    if (text) text.textContent = 'Waiting for GPS…';
+}
+
+function hideTrackingStrip() {
+    const strip = $('#tracking-strip');
+    if (strip) strip.hidden = true;
+}
+
+function updateTrackingStrip(nearestLoc, nearestDistMiles, instantRadiusMiles) {
+    const strip = $('#tracking-strip');
+    if (!strip || strip.hidden) return;
+    const dot = $('#tracking-dot');
+    const text = $('#tracking-text');
+    if (!dot || !text) return;
+
+    // Don't overwrite the brief "firing" state
+    if (dot.classList.contains('firing')) return;
+
+    dot.classList.add('locked');
+
+    if (!nearestLoc) {
+        const total = currentTour ? currentTour.locations.filter(l => l.audio).length : 0;
+        text.innerHTML = `<strong>All ${total} stops triggered.</strong> Walk back through to replay.`;
+        return;
+    }
+
+    const ft = Math.round(nearestDistMiles * 5280);
+    const inside = nearestDistMiles <= instantRadiusMiles;
+    const verb = inside ? 'inside' : 'to';
+    text.innerHTML = `Tracking · <strong>${ft} ft</strong> ${verb} <strong>${nearestLoc.name}</strong>`;
+}
+
+let _firingResetTimer = null;
+function markTrackingFiring(loc) {
+    const dot = $('#tracking-dot');
+    const text = $('#tracking-text');
+    if (!dot || !text) return;
+    dot.classList.remove('locked');
+    dot.classList.add('firing');
+    text.innerHTML = `Triggering · <strong>${loc.name}</strong>`;
+    if (_firingResetTimer) clearTimeout(_firingResetTimer);
+    _firingResetTimer = setTimeout(() => {
+        dot.classList.remove('firing');
+        dot.classList.add('locked');
+    }, 4000);
 }
 
 async function requestWakeLock() {
