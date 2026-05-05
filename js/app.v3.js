@@ -520,6 +520,11 @@ function loadAudioForLocation(loc) {
     }
 
     audio.pause();
+    // The unlock primer mutes this element; if its priming play() rejects
+    // we never reach the .then() that unmutes it. Always reset before real
+    // playback or every stop plays silently.
+    audio.muted = false;
+    audio.volume = 1.0;
 
     isPlaying = false;
     $('.icon-play').classList.remove('hidden');
@@ -1069,8 +1074,15 @@ function unlockAudio() {
             audio.pause();
             audio.muted = false;
             audioUnlocked = true;
-        }).catch(() => {});
+        }).catch(() => {
+            // Priming play rejected — make sure we don't leave the
+            // element muted, otherwise every later play() is silent.
+            audio.muted = false;
+        });
     } else {
+        // Subsequent gestures: the priming Promise may not have resolved
+        // yet, so explicitly unmute in case we're still in the priming window.
+        audio.muted = false;
         audioUnlocked = true;
     }
     // Start the silent keep-alive track on the same gesture
