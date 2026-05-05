@@ -1095,6 +1095,73 @@ function unlockAudio() {
 });
 
 // ===========================
+// Audio debug overlay (build 9)
+// Surfaces the audio element's real state so we can diagnose silent
+// playback in the field. Polls every 500ms.
+// ===========================
+
+let _lastPlayResult = '—';
+
+// Wrap audio.play() so we can capture rejections that the calling code swallows.
+const _origPlayWrap = (a) => {
+    if (!a || a._wrapped) return a;
+    const orig = a.play.bind(a);
+    a.play = function () {
+        const t = Date.now();
+        return orig().then((v) => {
+            _lastPlayResult = `ok @ ${new Date(t).toLocaleTimeString()}`;
+            return v;
+        }).catch((e) => {
+            _lastPlayResult = `${e && e.name || 'err'}: ${(e && e.message || '').slice(0, 60)}`;
+            throw e;
+        });
+    };
+    a._wrapped = true;
+    return a;
+};
+
+// Patch any future Audio() and the existing one
+const _origAudio = window.Audio;
+window.Audio = function (...args) {
+    const a = new _origAudio(...args);
+    return _origPlayWrap(a);
+};
+window.Audio.prototype = _origAudio.prototype;
+
+setInterval(() => {
+    const stateEl = document.getElementById('dbg-state');
+    const flagsEl = document.getElementById('dbg-flags');
+    const srcEl   = document.getElementById('dbg-src');
+    const errEl   = document.getElementById('dbg-err');
+    if (!stateEl) return;
+
+    if (audio && !audio._wrapped) _origPlayWrap(audio);
+
+    if (!audio) {
+        stateEl.textContent = 'no element';
+        flagsEl.textContent = `unlocked=${audioUnlocked}`;
+        srcEl.textContent   = 'src=—';
+        errEl.textContent   = `last play: ${_lastPlayResult}`;
+        return;
+    }
+
+    const states = ['HAVE_NOTHING','HAVE_METADATA','HAVE_CURRENT_DATA','HAVE_FUTURE_DATA','HAVE_ENOUGH_DATA'];
+    const netStates = ['EMPTY','IDLE','LOADING','NO_SOURCE'];
+    stateEl.textContent =
+        `paused=${audio.paused} ready=${states[audio.readyState] || audio.readyState} net=${netStates[audio.networkState] || audio.networkState}`;
+    flagsEl.textContent =
+        `muted=${audio.muted} vol=${audio.volume.toFixed(2)} t=${audio.currentTime.toFixed(1)}/${(audio.duration||0).toFixed(1)} unlocked=${audioUnlocked}`;
+    const src = audio.src ? audio.src.replace(/^.*\//, '') : '—';
+    srcEl.textContent = `src=${src}`;
+    let errStr = _lastPlayResult;
+    if (audio.error) {
+        const codes = ['', 'ABORTED', 'NETWORK', 'DECODE', 'SRC_NOT_SUPPORTED'];
+        errStr += ` · audio.error=${codes[audio.error.code] || audio.error.code}`;
+    }
+    errEl.textContent = `last play: ${errStr}`;
+}, 500);
+
+// ===========================
 // Init
 // ===========================
 

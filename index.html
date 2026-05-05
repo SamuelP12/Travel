@@ -19,7 +19,7 @@
         <div class="status-bar"></div>
         <div class="home-header">
             <h1 class="app-title">Travel</h1>
-            <p class="app-subtitle">Your Personal Audio Tour Guide <span style="opacity:.5;font-size:.8em">· build 8</span></p>
+            <p class="app-subtitle">Your Personal Audio Tour Guide <span style="opacity:.5;font-size:.8em">· build 9</span></p>
             <div class="search-row">
                 <div class="search-bar">
                     <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -124,6 +124,24 @@
         </div>
     </div>
 
+    <!-- Audio debug overlay — visible on every screen, lets us see what
+         the audio element is actually doing -->
+    <div class="audio-debug" id="audio-debug">
+        <div class="audio-debug-row">
+            <strong>audio</strong>
+            <span id="dbg-state">no element</span>
+        </div>
+        <div class="audio-debug-row">
+            <span id="dbg-flags">muted=? vol=? paused=?</span>
+        </div>
+        <div class="audio-debug-row">
+            <span id="dbg-src">src=—</span>
+        </div>
+        <div class="audio-debug-row">
+            <span id="dbg-err">last play: —</span>
+        </div>
+    </div>
+
     <!-- Screen 4: Audio Player -->
     <div class="screen" id="screen-player">
         <div class="player-top-bar">
@@ -224,6 +242,6 @@
         })();
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="js/app.v3.js?v=8"></script>
+    <script src="js/app.v3.js?v=9"></script>
 </body>
 </html>

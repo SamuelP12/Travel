@@ -507,6 +507,28 @@ input {
     padding: 8px 20px 40px;
 }
 
+/* Audio debug overlay (build 9 diagnostic — visible always) */
+.audio-debug {
+    position: fixed;
+    top: 6px;
+    left: 6px;
+    right: 6px;
+    z-index: 9999;
+    background: rgba(0,0,0,0.85);
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 10.5px;
+    line-height: 1.4;
+    pointer-events: none;
+    border: 1px solid rgba(255,255,255,0.15);
+}
+.audio-debug-row { display: block; }
+.audio-debug strong { color: #34d399; font-weight: 600; margin-right: 6px; }
+.audio-debug .err { color: #f87171; }
+.audio-debug .ok  { color: #34d399; }
+
 /* Live GPS tracking strip on locations screen */
 .tracking-strip {
     display: flex;
