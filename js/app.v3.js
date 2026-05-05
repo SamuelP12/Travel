@@ -514,17 +514,19 @@ function formatTime(seconds) {
 }
 
 function loadAudioForLocation(loc) {
-    // Reuse a single Audio element so iOS keeps its autoplay unlock
-    if (!audio) {
-        audio = new Audio();
+    // Tear down any existing audio element. We create a fresh Audio() with
+    // the URL in the constructor every time — this is the pattern that
+    // shipped before the May-4 "harden audio" refactor and was reliable.
+    // The reuse-and-rebind pattern leaves the element in odd states (muted,
+    // suspended audio session) that ate playback in the field.
+    if (audio) {
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.load();
+        audio.onloadedmetadata = null;
+        audio.ontimeupdate = null;
+        audio.onended = null;
     }
-
-    audio.pause();
-    // The unlock primer mutes this element; if its priming play() rejects
-    // we never reach the .then() that unmutes it. Always reset before real
-    // playback or every stop plays silently.
-    audio.muted = false;
-    audio.volume = 1.0;
 
     isPlaying = false;
     $('.icon-play').classList.remove('hidden');
@@ -534,43 +536,34 @@ function loadAudioForLocation(loc) {
     $('#time-total').textContent = '0:00';
 
     if (loc.audio) {
-        audio.src = loc.audio;
-        audio.load();
+        audio = new Audio(loc.audio);
+        audio.preload = 'auto';
 
-        audio.onloadedmetadata = () => {
+        audio.addEventListener('loadedmetadata', () => {
             $('#time-total').textContent = formatTime(audio.duration);
-        };
-        audio.ontimeupdate = () => {
+        });
+        audio.addEventListener('timeupdate', () => {
             if (audio.duration) {
                 const pct = (audio.currentTime / audio.duration) * 100;
                 $('#progress-fill').style.width = pct + '%';
                 $('#time-current').textContent = formatTime(audio.currentTime);
             }
-        };
-        audio.onended = () => {
+        });
+        audio.addEventListener('ended', () => {
             isPlaying = false;
             $('.icon-play').classList.remove('hidden');
             $('.icon-pause').classList.add('hidden');
-            // Resume the keep-alive track so the tab stays alive between stops
-            startKeepAliveLoop();
-            // Drain queued geofence stops first — these are stops the user
-            // drove past while we were playing something else
             if (pendingStops.length > 0) {
                 const next = pendingStops.shift();
                 startStopAudio(next);
                 return;
             }
-            // Otherwise auto-advance to the next stop in the tour
             if (currentLocationIndex < currentTour.locations.length - 1) {
                 updatePlayerForLocation(currentLocationIndex + 1);
             }
-        };
+        });
     } else {
-        audio.removeAttribute('src');
-        audio.load();
-        audio.onloadedmetadata = null;
-        audio.ontimeupdate = null;
-        audio.onended = null;
+        audio = null;
     }
 }
 
@@ -1001,98 +994,26 @@ $('#btn-locate').addEventListener('click', () => {
 // Unlock audio + keep-alive loop
 // ===========================
 
-// Build a 5-second silent WAV in memory so we don't have to ship a file.
-// Used as a continuously-looping silent track to keep iOS Safari from
-// suspending the tab when the screen locks or the user switches apps —
-// `geolocation.watchPosition` only fires while the tab is alive, and
-// "media is playing" is the cheapest way to keep it alive on iOS.
-function createSilentBlobUrl() {
-    const sampleRate = 22050;
-    const duration = 5;
-    const numSamples = sampleRate * duration;
-    const buffer = new ArrayBuffer(44 + numSamples * 2);
-    const view = new DataView(buffer);
-    let p = 0;
-    const wstr = (s) => { for (let i = 0; i < s.length; i++) view.setUint8(p++, s.charCodeAt(i)); };
-    wstr('RIFF'); view.setUint32(p, 36 + numSamples * 2, true); p += 4;
-    wstr('WAVE'); wstr('fmt ');
-    view.setUint32(p, 16, true); p += 4;
-    view.setUint16(p, 1, true); p += 2;   // PCM
-    view.setUint16(p, 1, true); p += 2;   // mono
-    view.setUint32(p, sampleRate, true); p += 4;
-    view.setUint32(p, sampleRate * 2, true); p += 4;
-    view.setUint16(p, 2, true); p += 2;
-    view.setUint16(p, 16, true); p += 2;
-    wstr('data'); view.setUint32(p, numSamples * 2, true); p += 4;
-    return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
-}
-
-function ensureSilentAudio() {
-    if (silentAudio) return;
-    silentAudio = new Audio(createSilentBlobUrl());
-    silentAudio.loop = true;
-    silentAudio.volume = 0;
-    silentAudio.preload = 'auto';
-    // Whenever the silent track gets paused by something other than us
-    // (system events, audio session interruption), try to restart it
-    silentAudio.addEventListener('pause', () => {
-        if (audio && !audio.paused) return; // real audio is playing — fine
-        // Small timeout so we don't fight legitimate pauses
-        setTimeout(() => {
-            if (silentAudio && silentAudio.paused && (!audio || audio.paused)) {
-                silentAudio.play().catch(() => {});
-            }
-        }, 200);
-    });
-}
-
-function startKeepAliveLoop() {
-    ensureSilentAudio();
-    if (silentAudio.paused) {
-        silentAudio.play().catch(() => {});
-    }
-}
-
-function pauseKeepAliveLoop() {
-    if (silentAudio && !silentAudio.paused) {
-        silentAudio.pause();
-    }
-}
-
+// Light unlock on first user gesture. We don't pre-create the main `audio`
+// element here — that ate playback in the field when the priming play()
+// rejected and left the element in a muted state. Instead we just play a
+// throwaway silent Audio() to satisfy the iOS audio session.
 function unlockAudio() {
-    if (audioUnlocked) {
-        // Keep-alive may have been paused by an interruption — make sure it's running
-        startKeepAliveLoop();
-        return;
-    }
-    // Pre-create the main audio element so future .play() calls (from the
-    // geofence trigger, with no user gesture) are trusted on iOS.
-    if (!audio) {
-        audio = new Audio();
-        audio.muted = true;
-        audio.play().then(() => {
-            audio.pause();
-            audio.muted = false;
-            audioUnlocked = true;
-        }).catch(() => {
-            // Priming play rejected — make sure we don't leave the
-            // element muted, otherwise every later play() is silent.
-            audio.muted = false;
-        });
-    } else {
-        // Subsequent gestures: the priming Promise may not have resolved
-        // yet, so explicitly unmute in case we're still in the priming window.
-        audio.muted = false;
-        audioUnlocked = true;
-    }
-    // Start the silent keep-alive track on the same gesture
-    startKeepAliveLoop();
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    const silent = new Audio();
+    silent.play().then(() => silent.pause()).catch(() => {});
 }
 
-// Listen for any user gesture to unlock audio
 ['touchstart', 'touchend', 'click'].forEach(evt => {
     document.addEventListener(evt, unlockAudio, { once: false });
 });
+
+// No-ops kept so the calls scattered through the codebase don't error.
+// The silent keep-alive loop was disabled — it was competing with real
+// audio for the iOS audio session.
+function startKeepAliveLoop() {}
+function pauseKeepAliveLoop() {}
 
 // ===========================
 // Audio debug overlay (build 9)
